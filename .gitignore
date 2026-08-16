@@ -57,11 +57,11 @@ logs/
 # Docker
 docker-compose.override.yml
 
-# Models (large files)
+# Models (large files) —— 只忽略仓库根目录下的 models/，避免误伤 python/src/models/ 源码包
 *.bin
 *.pt
 *.onnx
-models/
+/models/
 
 # OS
 .DS_Store
