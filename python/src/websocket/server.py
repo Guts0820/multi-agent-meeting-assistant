@@ -15,10 +15,14 @@ from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 from loguru import logger
 
 from ..graph.meeting_graph import run_meeting_pipeline
 from ..models.schemas import MeetingStatus
+
+
+load_dotenv()
 
 
 app = FastAPI(

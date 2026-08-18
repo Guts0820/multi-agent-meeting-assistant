@@ -109,6 +109,7 @@ class TranscriptionAgent:
         logger.info(f"[TranscriptionAgent] Processing meeting: {meeting_id}")
 
         state["status"] = MeetingStatus.TRANSCRIBING
+        errors_delta: list[str] = []
 
         audio_data = state.get("audio_data", b"")
         if not audio_data:
@@ -117,7 +118,11 @@ class TranscriptionAgent:
             state["transcript_text"] = self._format_transcript_text(
                 state["transcript"]
             )
-            return state
+            return {
+                "status": state["status"],
+                "transcript": state["transcript"],
+                "transcript_text": state["transcript_text"],
+            }
 
         try:
             self._lazy_init()
@@ -130,15 +135,20 @@ class TranscriptionAgent:
             )
         except Exception as e:
             logger.error(f"[TranscriptionAgent] Error: {e}")
-            state["errors"] = state.get("errors", []) + [
-                f"TranscriptionAgent: {str(e)}"
-            ]
+            errors_delta.append(f"TranscriptionAgent: {str(e)}")
             state["transcript"] = self._generate_demo_transcript(meeting_id)
             state["transcript_text"] = self._format_transcript_text(
                 state["transcript"]
             )
 
-        return state
+        updates = {
+            "status": state["status"],
+            "transcript": state["transcript"],
+            "transcript_text": state["transcript_text"],
+        }
+        if errors_delta:
+            updates["errors"] = errors_delta
+        return updates
 
     async def _transcribe(
         self, audio_data: bytes, meeting_id: str

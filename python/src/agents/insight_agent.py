@@ -82,11 +82,12 @@ class InsightAgent:
 
         transcript = state.get("transcript")
         transcript_text = state.get("transcript_text", "")
+        errors_delta: list[str] = []
 
         if not transcript_text:
             logger.warning("[InsightAgent] No transcript text available")
             state["insights"] = MeetingInsight(meeting_id=meeting_id)
-            return state
+            return {"insights": state["insights"]}
 
         try:
             # Step 1: 规则引擎计算发言统计
@@ -123,16 +124,17 @@ class InsightAgent:
 
         except Exception as e:
             logger.error(f"[InsightAgent] Error: {e}")
-            state["errors"] = state.get("errors", []) + [
-                f"InsightAgent: {str(e)}"
-            ]
+            errors_delta.append(f"InsightAgent: {str(e)}")
             speaker_stats = self._compute_speaker_stats(transcript)
             state["insights"] = MeetingInsight(
                 meeting_id=meeting_id,
                 speaker_stats=speaker_stats,
             )
 
-        return state
+        updates = {"insights": state["insights"]}
+        if errors_delta:
+            updates["errors"] = errors_delta
+        return updates
 
     @staticmethod
     def _compute_speaker_stats(

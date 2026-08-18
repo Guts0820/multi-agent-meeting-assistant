@@ -35,7 +35,11 @@ class MiniMaxClient:
             headers={"Authorization": f"Bearer {self.api_key}"},
         )
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(min=1, max=10),
+        reraise=True,
+    )
     async def chat(
         self,
         messages: list[dict[str, str]],
@@ -61,8 +65,10 @@ class MiniMaxClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
-        if response_format:
-            payload["response_format"] = response_format
+        # 注意: MiniMax chatcompletion_v2 不识别 OpenAI 风格的
+        # response_format={"type": "json_object"} (返回 2013 错误)，
+        # 因此不随请求发送；JSON 解析由 chat_json 的容错提取逻辑兜底。
+        _ = response_format
 
         url = f"{self.BASE_URL}/text/chatcompletion_v2"
         if self.group_id:
@@ -72,7 +78,18 @@ class MiniMaxClient:
         response.raise_for_status()
 
         data = response.json()
-        if "choices" in data and len(data["choices"]) > 0:
+
+        base_resp = data.get("base_resp") or {}
+        status_code = base_resp.get("status_code")
+        if status_code not in (None, 0):
+            logger.error(f"MiniMax API error: {base_resp}")
+            raise ValueError(
+                f"MiniMax API error ({status_code}): "
+                f"{base_resp.get('status_msg', 'unknown')}"
+            )
+
+        choices = data.get("choices") or []
+        if choices:
             return data["choices"][0]["message"]["content"]
 
         logger.error(f"MiniMax API unexpected response: {data}")

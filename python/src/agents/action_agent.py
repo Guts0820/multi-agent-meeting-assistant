@@ -91,12 +91,13 @@ class ActionAgent:
         logger.info(f"[ActionAgent] Processing meeting: {meeting_id}")
 
         transcript_text = state.get("transcript_text", "")
+        errors_delta: list[str] = []
         if not transcript_text:
             logger.warning("[ActionAgent] No transcript text available")
             state["actions"] = ActionResult(
                 meeting_id=meeting_id, action_items=[]
             )
-            return state
+            return {"actions": state["actions"]}
 
         try:
             action_items = await self._extract_actions(transcript_text)
@@ -115,14 +116,15 @@ class ActionAgent:
             )
         except Exception as e:
             logger.error(f"[ActionAgent] Error: {e}")
-            state["errors"] = state.get("errors", []) + [
-                f"ActionAgent: {str(e)}"
-            ]
+            errors_delta.append(f"ActionAgent: {str(e)}")
             state["actions"] = ActionResult(
                 meeting_id=meeting_id, action_items=[]
             )
 
-        return state
+        updates = {"actions": state["actions"]}
+        if errors_delta:
+            updates["errors"] = errors_delta
+        return updates
 
     async def _extract_actions(self, transcript: str) -> list[ActionItem]:
         """调用 LLM 提取行动项"""

@@ -41,6 +41,7 @@ LangGraph 会议处理图 —— 多Agent编排核心
 from __future__ import annotations
 
 import asyncio
+import operator
 from typing import Any, TypedDict, Annotated
 
 from langgraph.graph import StateGraph, START, END
@@ -87,7 +88,7 @@ class GraphState(TypedDict, total=False):
     followup: Any
 
     # 错误记录
-    errors: list[str]
+    errors: Annotated[list[str], operator.add]
 
 
 # ============================================================

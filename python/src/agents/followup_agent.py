@@ -9,6 +9,9 @@ Follow-up Agent（跟进Agent）
 from __future__ import annotations
 
 from datetime import datetime
+import os
+from pathlib import Path
+import re
 from typing import Any
 
 from loguru import logger
@@ -57,6 +60,7 @@ class FollowUpAgent:
         insights: MeetingInsight | None = state.get("insights")
 
         result = FollowUpResult(meeting_id=meeting_id)
+        errors_delta: list[str] = []
 
         try:
             # Step 1: 生成会议纪要 Markdown
@@ -115,13 +119,17 @@ class FollowUpAgent:
 
         except Exception as e:
             logger.error(f"[FollowUpAgent] Error: {e}")
-            state["errors"] = state.get("errors", []) + [
-                f"FollowUpAgent: {str(e)}"
-            ]
+            errors_delta.append(f"FollowUpAgent: {str(e)}")
             state["followup"] = result
             state["status"] = MeetingStatus.COMPLETED
 
-        return state
+        updates = {
+            "followup": state["followup"],
+            "status": state["status"],
+        }
+        if errors_delta:
+            updates["errors"] = errors_delta
+        return updates
 
     @staticmethod
     def _format_summary_markdown(summary: MeetingSummary | None) -> str:
@@ -223,7 +231,7 @@ class FollowUpAgent:
         actions_md: str,
         insights_md: str,
     ) -> str:
-        """生成完整会议报告（简化实现，返回本地路径）"""
+        """生成完整会议报告并写入 Markdown 文件。"""
         report = (
             f"# 会议报告 - {meeting_id}\n\n"
             f"生成时间: {datetime.now().isoformat()}\n\n"
@@ -234,5 +242,13 @@ class FollowUpAgent:
             f"---\n\n"
             f"## 会议洞察\n\n{insights_md}\n"
         )
-        logger.info(f"Report generated for meeting {meeting_id}")
-        return f"/reports/{meeting_id}.md"
+        reports_dir = Path(os.getenv("REPORTS_DIR", r"D:\\Codex_Reports"))
+        reports_dir.mkdir(parents=True, exist_ok=True)
+
+        # meeting_id 可来自 WebSocket 路径，避免其影响最终的文件路径。
+        safe_meeting_id = re.sub(r"[^A-Za-z0-9_.-]", "_", meeting_id)
+        report_path = reports_dir / f"meeting-report-{safe_meeting_id}.md"
+        report_path.write_text(report, encoding="utf-8")
+
+        logger.info(f"Report written for meeting {meeting_id}: {report_path}")
+        return str(report_path)

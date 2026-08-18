@@ -84,13 +84,14 @@ class SummaryAgent:
         logger.info(f"[SummaryAgent] Processing meeting: {meeting_id}")
 
         transcript_text = state.get("transcript_text", "")
+        errors_delta: list[str] = []
         if not transcript_text:
             logger.warning("[SummaryAgent] No transcript text available")
             state["summary"] = MeetingSummary(
                 title="未知会议", date="", participants=[], topics=[],
                 decisions=[], next_steps=[],
             )
-            return state
+            return {"summary": state["summary"]}
 
         try:
             summary = await self._generate_summary(transcript_text)
@@ -101,12 +102,13 @@ class SummaryAgent:
             )
         except Exception as e:
             logger.error(f"[SummaryAgent] Error: {e}")
-            state["errors"] = state.get("errors", []) + [
-                f"SummaryAgent: {str(e)}"
-            ]
+            errors_delta.append(f"SummaryAgent: {str(e)}")
             state["summary"] = self._generate_fallback_summary(transcript_text)
 
-        return state
+        updates = {"summary": state["summary"]}
+        if errors_delta:
+            updates["errors"] = errors_delta
+        return updates
 
     async def _generate_summary(self, transcript: str) -> MeetingSummary:
         """调用 LLM 生成结构化摘要"""
